@@ -21,6 +21,10 @@ export function getDriveFileUrl(fileId: string): string {
     return `https://drive.google.com/file/d/${fileId}/preview`;
 }
 
+export function getDrivePdfThumbnail(fileId: string, size = 1200): string {
+    return `https://drive.google.com/thumbnail?id=${fileId}&sz=s${size}`;
+}
+
 /** Force-download URL. */
 export function getDriveDownloadUrl(fileId: string): string {
     return `https://drive.google.com/uc?export=download&id=${fileId}`;
