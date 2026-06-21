@@ -1,7 +1,6 @@
-'use client';
-
-import { useState, useEffect, useRef } from 'react';
-import { DRIVE_FILES, getDriveImageUrl, getDriveFileUrl } from './lib/drive';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useFiles, folder, onlyImages, onlyPdfs, findByName, type ImageKitFile } from '../lib/useFiles';
+import { getImageUrl, getFileUrl, getPdfPageThumbnail } from '../lib/imagekit';
 
 // ─── NAV LINKS — edit here ────────────────────────────────────────────────────
 const NAV_LINKS = [
@@ -12,48 +11,76 @@ const NAV_LINKS = [
     { label: 'Kontakt',     href: '#kontakt'      },
 ];
 
-// ─── HERO CAROUSEL IMAGES — swap IDs or add more ─────────────────────────────
-const HERO_IMAGES = [
-    DRIVE_FILES.staze2526_zdjecia.cerezoCabezudo_2,
-    DRIVE_FILES.staze2526_zdjecia.colors_5,
-    DRIVE_FILES.staze2526_zdjecia.chiringuito_2,
-    DRIVE_FILES.staze2526_zdjecia.circulo_7,
-    DRIVE_FILES.staze2526_zdjecia.hotelBali_2,
-    DRIVE_FILES.staze2526_zdjecia.cerezoCabezudo_1,
-];
+// ─── FOLDER NAMES — copied exactly from the real ImageKit folder paths
+//     in files.json. Matching in folder() is still fuzzy as a safety net,
+//     but these are now exact so nothing should silently come up empty. ───
+const FOLDERS = {
+    staze2526_zdjecia:      'Hiszpania 2025-2026 Nasze staże u pracodawców - w obiektywie',
+    staze2526_prezentacje:  'Hiszpania 2025-2026 Naze staże u pracodawców - prezentacje',
+    galeria2526:             'Hiszpania 2025-2026 Galeria po godzinach',
+    staze2425_zdjecia:      'Hiszpania 2024-2025 Nasze staże u pracodawców w obiektywie',
+    staze2425_prezentacje:  'Hiszpania 2024-2025 Nasze staże u pracodawców - prezentacje',
+    galeria2425:             'Hiszpania 2024-2025 Galeria po godzinach',
+    slowniczki2526:           'Hiszpania 2025-2026 Nasze słowniczki zawodowe',
+    slowniczki2425:           'Hiszpania 2024-2025 Nasze słowniczki zawodowe',
+    podsumowania:            'Podsumowania',
+    erasmusDay:              'ERASMUS DAY',
+};
 
-// ─── INTERNSHIP CARDS ─────────────────────────────────────────────────────────
-const INTERNSHIP_CARDS = [
-    { name: 'Hotel Spirit',         location: 'Benalmádena', fileId: DRIVE_FILES.staze2526_zdjecia.hotelSpirit_1 },
-    { name: 'Chiringuito Copacabana',location: 'Málaga',     fileId: DRIVE_FILES.staze2526_zdjecia.chiringuito_1 },
-    { name: 'Colors Peluquería',    location: 'Torremolinos',fileId: DRIVE_FILES.staze2526_zdjecia.colors_1      },
-    { name: 'Samsung Telemalaga',   location: 'Málaga',      fileId: DRIVE_FILES.staze2526_zdjecia.samsung_telemalaga_7 },
-    { name: 'Círculo de Empresarios',location: 'Málaga',     fileId: DRIVE_FILES.staze2526_zdjecia.circulo_4    },
-    { name: 'La Tómbola',           location: 'Benalmádena', fileId: DRIVE_FILES.staze2526_zdjecia.laTombola    },
-];
-
-// ─── GALLERY ──────────────────────────────────────────────────────────────────
-const GALLERY_IMAGES = [
-    DRIVE_FILES.galeria2526.whatsapp_20_58_26_9,
-    DRIVE_FILES.galeria2526.impressions_12,
-    DRIVE_FILES.galeria2526.impressions_3maj,
-    DRIVE_FILES.galeria2526.whatsapp_23_57_0,
-    DRIVE_FILES.galeria2526.impressions_10,
-    DRIVE_FILES.galeria2526.whatsapp_20_58_25_4,
-    DRIVE_FILES.galeria2526.impressions_29kwi_16_3,
-    DRIVE_FILES.galeria2526.whatsapp_21_17_1,
+// ─── CARD NAME → filename fragment, used to pick a representative photo
+//     for each internship card out of the staże2526 photo folder. ──────────
+const CARD_DEFS = [
+    { name: 'Hotel Spirit',           location: 'Benalmádena',  match: 'Hotel Spirit' },
+    { name: 'Chiringuito Copacabana', location: 'Málaga',       match: 'Chiringuito Copacabana' },
+    { name: 'Colors Peluquería',      location: 'Torremolinos', match: 'Colors productos' },
+    { name: 'Samsung Telemalaga',     location: 'Málaga',       match: 'Samsung' },
+    { name: 'Círculo de Empresarios', location: 'Málaga',       match: 'Circulo de Empresarios' },
+    { name: 'La Tómbola',             location: 'Benalmádena',  match: 'La Tómbola' },
 ];
 
 export default function Home() {
+    const { byFolder, loading, error } = useFiles();
+
     const [current, setCurrent]   = useState(0);
     const [menuOpen, setMenuOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+    // ─── Derive image/PDF sets from the live ImageKit file list ────────────
+    const staze2526Photos = useMemo(
+        () => onlyImages(folder(byFolder, FOLDERS.staze2526_zdjecia)),
+        [byFolder]
+    );
+    const staze2526Pdfs = useMemo(
+        () => onlyPdfs(folder(byFolder, FOLDERS.staze2526_prezentacje)),
+        [byFolder]
+    );
+    const galeria2526Photos = useMemo(
+        () => onlyImages(folder(byFolder, FOLDERS.galeria2526)),
+        [byFolder]
+    );
+
+    // Hero carousel: first 6 photos from the staże gallery (deterministic order).
+    const HERO_IMAGES = useMemo(() => staze2526Photos.slice(0, 6), [staze2526Photos]);
+
+    // Internship cards: pick one representative photo per workplace by filename match.
+    const INTERNSHIP_CARDS = useMemo(
+        () =>
+            CARD_DEFS.map((c) => ({
+                ...c,
+                file: findByName(staze2526Photos, c.match) ?? staze2526Photos[0],
+            })).filter((c) => c.file),
+        [staze2526Photos]
+    );
+
+    // Gallery section: first 8 photos from the "po godzinach" folder.
+    const GALLERY_IMAGES = useMemo(() => galeria2526Photos.slice(0, 8), [galeria2526Photos]);
+
     useEffect(() => {
+        if (HERO_IMAGES.length === 0) return;
         timerRef.current = setInterval(() => setCurrent(c => (c + 1) % HERO_IMAGES.length), 4500);
         return () => { if (timerRef.current) clearInterval(timerRef.current); };
-    }, []);
+    }, [HERO_IMAGES.length]);
 
     useEffect(() => {
         const onScroll = () => setScrolled(window.scrollY > 60);
@@ -66,6 +93,26 @@ export default function Home() {
         if (timerRef.current) clearInterval(timerRef.current);
         timerRef.current = setInterval(() => setCurrent(c => (c + 1) % HERO_IMAGES.length), 4500);
     };
+
+    if (error) {
+        return (
+            <div style={{ padding: '4rem', textAlign: 'center', fontFamily: 'sans-serif' }}>
+                <h2>Nie udało się wczytać plików z ImageKit</h2>
+                <p style={{ color: '#888' }}>{error}</p>
+            </div>
+        );
+    }
+
+    if (loading) {
+        return (
+            <div style={{
+                minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'sans-serif', color: '#0048b6', fontSize: '1.1rem',
+            }}>
+                Ładowanie galerii…
+            </div>
+        );
+    }
 
     return (
         <>
@@ -375,8 +422,11 @@ export default function Home() {
           border-radius: var(--radius); overflow: hidden;
           border: 1px solid rgba(0,72,182,.12);
           background: var(--blue-light);
+          display: block; text-decoration: none;
+          transition: transform .18s ease, box-shadow .18s ease;
         }
-        .pdf-card iframe { width: 100%; height: 195px; border: none; display: block; }
+        .pdf-card:hover { transform: translateY(-3px); box-shadow: var(--stripe-shadow); }
+        .pdf-card img { width: 100%; height: 195px; object-fit: cover; display: block; }
         .pdf-label {
           padding: .7rem 1rem; font-size: .78rem; font-weight: 600;
           color: var(--blue-dark); text-transform: uppercase;
@@ -461,11 +511,11 @@ export default function Home() {
 
             {/* HERO */}
             <section className="hero">
-                {HERO_IMAGES.map((id, i) => (
+                {HERO_IMAGES.map((file, i) => (
                     <div
-                        key={id}
+                        key={file.fileId}
                         className={`slide${i === current ? ' active' : ''}`}
-                        style={{ backgroundImage: `url(${getDriveImageUrl(id, 1200)})` }}
+                        style={{ backgroundImage: `url(${getImageUrl(file.filePath, { width: 1200 })})` }}
                     />
                 ))}
                 <div className="hero-overlay" />
@@ -497,7 +547,7 @@ export default function Home() {
                     <div className="cards">
                         {INTERNSHIP_CARDS.map(c => (
                             <div className="card" key={c.name}>
-                                <img src={getDriveImageUrl(c.fileId, 600)} alt={c.name} loading="lazy" />
+                                <img src={getImageUrl(c.file!.filePath, { width: 600 })} alt={c.name} loading="lazy" />
                                 <div className="card-body">
                                     <div className="card-name">{c.name}</div>
                                     <div className="card-loc">📍 {c.location}</div>
@@ -518,9 +568,9 @@ export default function Home() {
                         i przyjaźnie na całe życie.
                     </p>
                     <div className="gallery">
-                        {GALLERY_IMAGES.map((id, i) => (
-                            <div className="gal-item" key={id}>
-                                <img src={getDriveImageUrl(id, 800)} alt={`Galeria ${i + 1}`} loading="lazy" />
+                        {GALLERY_IMAGES.map((file, i) => (
+                            <div className="gal-item" key={file.fileId}>
+                                <img src={getImageUrl(file.filePath, { width: 800 })} alt={`Galeria ${i + 1}`} loading="lazy" />
                             </div>
                         ))}
                     </div>
@@ -561,15 +611,24 @@ export default function Home() {
                     <h2 className="sec-title">Prezentacje stażowe</h2>
                     <p className="sec-body">Każdy zespół przygotował prezentację podsumowującą swój pobyt.</p>
                     <div className="pdf-grid">
-                        {(Object.entries(DRIVE_FILES.staze2526_prezentacje) as [string, string][])
-                            .filter(([k]) => k.endsWith('_pdf'))
-                            .slice(0, 6)
-                            .map(([key, id]) => (
-                                <div className="pdf-card" key={key}>
-                                    <iframe src={getDriveFileUrl(id)} title={key} allowFullScreen />
-                                    <div className="pdf-label">{key.replace(/_pdf$/, '').replace(/_/g, ' ')}</div>
+                        {staze2526Pdfs.map((file) => (
+                            <a
+                                className="pdf-card"
+                                key={file.fileId}
+                                href={getFileUrl(file.filePath)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                <img
+                                    src={getPdfPageThumbnail(file.filePath, 1, { width: 600 })}
+                                    alt={file.name}
+                                    loading="lazy"
+                                />
+                                <div className="pdf-label">
+                                    {file.name.replace(/\.pdf$/i, '').replace(/[_-]/g, ' ')}
                                 </div>
-                            ))}
+                            </a>
+                        ))}
                     </div>
                 </div>
             </section>
