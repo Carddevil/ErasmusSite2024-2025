@@ -13,7 +13,7 @@
 
 /** Direct image src — use in <img> tags. sz = max pixels (default 800). */
 export function getDriveImageUrl(fileId: string, sz = 800): string {
-    return `https://drive.google.com/thumbnail?id=${fileId}&sz=s${sz}`;
+    return `https://lh3.googleusercontent.com/d/${fileId}=s${sz}`;
 }
 
 /** Embed/preview URL — use in <iframe> for PDFs, PPTX, images. */
