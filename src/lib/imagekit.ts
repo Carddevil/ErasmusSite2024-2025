@@ -31,17 +31,19 @@ function buildTransformString(t?: Transform): string {
 
 /**
  * Ensure exactly one leading slash, no double slashes, and that every path
- * segment is properly URL-encoded. Filenames frequently contain spaces,
- * accented characters, or parentheses (e.g. "Cerezo Topografía - Cabezudo
- * Gestion Documental 1.jpg"); left raw, these break in <img src>, and
- * especially inside CSS url(...) where unencoded spaces/parens can fail
- * to parse at all.
+ * segment is encoded the same way ImageKit's own API encodes its `url`
+ * field: spaces and accented/special characters are percent-encoded, but
+ * commas are left as literal `,` characters (ImageKit's CDN treats `,` as
+ * a safe path character — encoding it as %2C breaks thumbnail generation
+ * for filenames like "Adrian, Marcel, Kevin i Oliwier - ....pdf").
  */
 function normalizePath(filePath: string): string {
     const clean = '/' + filePath.replace(/^\/+/, '');
     return clean
         .split('/')
-        .map((segment) => (segment ? encodeURIComponent(segment) : segment))
+        .map((segment) =>
+            segment ? encodeURIComponent(segment).replace(/%2C/g, ',') : segment
+        )
         .join('/');
 }
 
@@ -61,6 +63,13 @@ export function getImageUrl(filePath: string, transform?: Transform): string {
  * Build a thumbnail URL for a specific page of a PDF (or other multi-page
  * asset). Page numbers start at 1. Great for rendering a PDF as a poster
  * image / card preview without loading the whole PDF.
+ *
+ * Uses path-based transforms (/tr:.../path) rather than query-string
+ * transforms (?tr=...). Filenames containing literal commas (e.g. "Adrian,
+ * Marcel, Kevin i Oliwier - ....pdf") sit unambiguously in their own path
+ * segment this way, with no risk of the CDN confusing a comma in the
+ * filename with the comma that separates transform parameters in a query
+ * string.
  */
 export function getPdfPageThumbnail(
     filePath: string,
@@ -69,8 +78,8 @@ export function getPdfPageThumbnail(
 ): string {
     const path = normalizePath(filePath);
     const tr = buildTransformString({ quality: 80, ...transform });
-    const query = tr ? `?tr=${tr.replace(/^tr:/, '')},pg-${page}` : `?tr=pg-${page}`;
-    return `${IMAGEKIT_URL_ENDPOINT}${path}/ik-thumbnail.jpg${query}`;
+    const trWithPage = tr ? `${tr},pg-${page}` : `tr:pg-${page}`;
+    return `${IMAGEKIT_URL_ENDPOINT}/${trWithPage}${path}/ik-thumbnail.jpg`;
 }
 
 /** Direct, unmodified file URL — good for <iframe> embeds or downloads. */

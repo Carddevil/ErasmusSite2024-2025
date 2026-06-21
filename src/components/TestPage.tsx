@@ -623,6 +623,25 @@ export default function Home() {
                                     src={getPdfPageThumbnail(file.filePath, 1, { width: 600 })}
                                     alt={file.name}
                                     loading="lazy"
+                                    onError={(e) => {
+                                        // Some filenames (commas, unusual punctuation) can trip
+                                        // ImageKit's thumbnail generator even when correctly
+                                        // URL-encoded. Fall back to a plain PDF placeholder
+                                        // instead of showing a broken image icon — the link
+                                        // to the actual file still works either way.
+                                        const img = e.currentTarget;
+                                        img.onerror = null;
+                                        img.src =
+                                            'data:image/svg+xml;utf8,' +
+                                            encodeURIComponent(
+                                                `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+                                                    <rect width="600" height="400" fill="#e8eef9"/>
+                                                    <text x="300" y="210" font-family="Arial, sans-serif"
+                                                          font-size="64" font-weight="700" fill="#0048b6"
+                                                          text-anchor="middle">PDF</text>
+                                                </svg>`
+                                            );
+                                    }}
                                 />
                                 <div className="pdf-label">
                                     {file.name.replace(/\.pdf$/i, '').replace(/[_-]/g, ' ')}
