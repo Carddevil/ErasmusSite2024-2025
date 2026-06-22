@@ -2,6 +2,9 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useFiles, folder, onlyImages, onlyPdfs, findByName, type ImageKitFile } from '../lib/useFiles';
 import { getImageUrl, getFileUrl, getPdfPageThumbnail } from '../lib/imagekit';
 
+// ─── EDITION TYPE ─────────────────────────────────────────────────────────────
+type Edition = '2526' | '2425';
+
 // ─── NAV LINKS — edit here ────────────────────────────────────────────────────
 const NAV_LINKS = [
     { label: 'Staże',       href: '#staze'       },
@@ -11,9 +14,7 @@ const NAV_LINKS = [
     { label: 'Kontakt',     href: '#kontakt'      },
 ];
 
-// ─── FOLDER NAMES — copied exactly from the real ImageKit folder paths
-//     in files.json. Matching in folder() is still fuzzy as a safety net,
-//     but these are now exact so nothing should silently come up empty. ───
+// ─── FOLDER NAMES ─────────────────────────────────────────────────────────────
 const FOLDERS = {
     staze2526_zdjecia:      'Hiszpania 2025-2026 Nasze staże u pracodawców - w obiektywie',
     staze2526_prezentacje:  'Hiszpania 2025-2026 Naze staże u pracodawców - prezentacje',
@@ -27,9 +28,8 @@ const FOLDERS = {
     erasmusDay:              'ERASMUS DAY',
 };
 
-// ─── CARD NAME → filename fragment, used to pick a representative photo
-//     for each internship card out of the staże2526 photo folder. ──────────
-const CARD_DEFS = [
+// ─── CARD DEFS per edition ────────────────────────────────────────────────────
+const CARD_DEFS_2526 = [
     { name: 'Hotel Spirit',           location: 'Benalmádena',  match: 'Hotel Spirit' },
     { name: 'Chiringuito Copacabana', location: 'Málaga',       match: 'Chiringuito Copacabana' },
     { name: 'Colors Peluquería',      location: 'Torremolinos', match: 'Colors productos' },
@@ -38,49 +38,112 @@ const CARD_DEFS = [
     { name: 'La Tómbola',             location: 'Benalmádena',  match: 'La Tómbola' },
 ];
 
+const CARD_DEFS_2425 = [
+    { name: 'Brunch IT',                  location: 'Málaga',        match: 'Brunch IT' },
+    { name: 'Forja Roja',                 location: 'Torremolinos',  match: 'Forja Roja' },
+    { name: 'Hotel Bali – Dorsol S.A.',   location: 'Benalmádena',   match: 'Hotel Bali' },
+    { name: 'Feel Hostel Soho Málaga',    location: 'Málaga',        match: 'Feel Hostel' },
+    { name: 'JD Spain Sports Fashion',    location: 'Málaga',        match: 'JD Spain' },
+    { name: 'Eurocosta 2013 SL',          location: 'Costa del Sol', match: 'Eurocosta' },
+    { name: 'iDevelop Training S.L.',     location: 'Málaga',        match: 'iDevelop' },
+    { name: 'Clínica de Podología',       location: 'Torremolinos',  match: 'Clínica de Podología' },
+];
+
+// ─── EDITION CONFIG ────────────────────────────────────────────────────────────
+const EDITION_CONFIG = {
+    '2526': {
+        label:       '2025/2026',
+        heroSub:     'Program Erasmus+ · Málaga 2025–2026',
+        heroBtn:     'Poznaj miejsca',
+        eyebrow:     'Erasmus+ 2025–2026',
+        bodyText:    'W roku szkolnym 2025/2026 nasi uczniowie odbyli staże zawodowe w renomowanych firmach na Costa del Sol. Poznaj miejsca, które stały się ich tymczasowym domem.',
+        cardDefs:    CARD_DEFS_2526,
+        photoFolder: 'staze2526_zdjecia'  as const,
+        pdfFolder:   'staze2526_prezentacje' as const,
+        galFolder:   'galeria2526' as const,
+    },
+    '2425': {
+        label:       '2024/2025',
+        heroSub:     'Program Erasmus+ · Málaga 2024–2025',
+        heroBtn:     'Poznaj miejsca',
+        eyebrow:     'Erasmus+ 2024–2025',
+        bodyText:    'W roku szkolnym 2024/2025 nasi uczniowie odbyli staże zawodowe w renomowanych firmach na Costa del Sol. Poznaj miejsca, które stały się ich tymczasowym domem.',
+        cardDefs:    CARD_DEFS_2425,
+        photoFolder: 'staze2425_zdjecia'  as const,
+        pdfFolder:   'staze2425_prezentacje' as const,
+        galFolder:   'galeria2425' as const,
+    },
+};
+
 export default function Home() {
     const { byFolder, loading, error } = useFiles();
 
-    const [current, setCurrent]   = useState(0);
-    const [menuOpen, setMenuOpen] = useState(false);
-    const [scrolled, setScrolled] = useState(false);
+    const [edition, setEdition]       = useState<Edition>('2526');
+    const [current, setCurrent]       = useState(0);
+    const [menuOpen, setMenuOpen]     = useState(false);
+    const [scrolled, setScrolled]     = useState(false);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    const cfg = EDITION_CONFIG[edition];
 
     // ─── Derive image/PDF sets from the live ImageKit file list ────────────
     const staze2526Photos = useMemo(
         () => onlyImages(folder(byFolder, FOLDERS.staze2526_zdjecia)),
         [byFolder]
     );
+    const staze2425Photos = useMemo(
+        () => onlyImages(folder(byFolder, FOLDERS.staze2425_zdjecia)),
+        [byFolder]
+    );
     const staze2526Pdfs = useMemo(
         () => onlyPdfs(folder(byFolder, FOLDERS.staze2526_prezentacje)),
+        [byFolder]
+    );
+    const staze2425Pdfs = useMemo(
+        () => onlyPdfs(folder(byFolder, FOLDERS.staze2425_prezentacje)),
         [byFolder]
     );
     const galeria2526Photos = useMemo(
         () => onlyImages(folder(byFolder, FOLDERS.galeria2526)),
         [byFolder]
     );
-
-    // Hero carousel: first 6 photos from the staże gallery (deterministic order).
-    const HERO_IMAGES = useMemo(() => staze2526Photos.slice(0, 6), [staze2526Photos]);
-
-    // Internship cards: pick one representative photo per workplace by filename match.
-    const INTERNSHIP_CARDS = useMemo(
-        () =>
-            CARD_DEFS.map((c) => ({
-                ...c,
-                file: findByName(staze2526Photos, c.match) ?? staze2526Photos[0],
-            })).filter((c) => c.file),
-        [staze2526Photos]
+    const galeria2425Photos = useMemo(
+        () => onlyImages(folder(byFolder, FOLDERS.galeria2425)),
+        [byFolder]
     );
 
-    // Gallery section: first 8 photos from the "po godzinach" folder.
-    const GALLERY_IMAGES = useMemo(() => galeria2526Photos.slice(0, 8), [galeria2526Photos]);
+    // Active-edition data
+    const activePhotos = edition === '2526' ? staze2526Photos : staze2425Photos;
+    const activePdfs   = edition === '2526' ? staze2526Pdfs   : staze2425Pdfs;
+    const activeGal    = edition === '2526' ? galeria2526Photos : galeria2425Photos;
+
+    // Hero carousel: first 6 photos from the active staże gallery
+    const HERO_IMAGES = useMemo(() => activePhotos.slice(0, 6), [activePhotos]);
+
+    // Internship cards
+    const INTERNSHIP_CARDS = useMemo(
+        () =>
+            cfg.cardDefs.map((c) => ({
+                ...c,
+                file: findByName(activePhotos, c.match) ?? activePhotos[0],
+            })).filter((c) => c.file),
+        [activePhotos, cfg.cardDefs]
+    );
+
+    // Gallery: first 8 photos
+    const GALLERY_IMAGES = useMemo(() => activeGal.slice(0, 8), [activeGal]);
+
+    // Reset carousel when edition changes
+    useEffect(() => {
+        setCurrent(0);
+    }, [edition]);
 
     useEffect(() => {
         if (HERO_IMAGES.length === 0) return;
+        if (timerRef.current) clearInterval(timerRef.current);
         timerRef.current = setInterval(() => setCurrent(c => (c + 1) % HERO_IMAGES.length), 4500);
         return () => { if (timerRef.current) clearInterval(timerRef.current); };
-    }, [HERO_IMAGES.length]);
+    }, [HERO_IMAGES.length, edition]);
 
     useEffect(() => {
         const onScroll = () => setScrolled(window.scrollY > 60);
@@ -92,6 +155,11 @@ export default function Home() {
         setCurrent(i);
         if (timerRef.current) clearInterval(timerRef.current);
         timerRef.current = setInterval(() => setCurrent(c => (c + 1) % HERO_IMAGES.length), 4500);
+    };
+
+    const switchEdition = (ed: Edition) => {
+        setEdition(ed);
+        setMenuOpen(false);
     };
 
     if (error) {
@@ -161,8 +229,35 @@ export default function Home() {
           font-weight: 800; font-size: 1.35rem;
           color: #fff; text-decoration: none;
           letter-spacing: .05em; text-transform: uppercase;
+          flex-shrink: 0;
         }
         .nav-logo span { color: #7eb3ff; }
+
+        /* ── EDITION SWITCHER ─────────────────────────────────────── */
+        .edition-switcher {
+          display: flex; align-items: center; gap: 4px;
+          background: rgba(0,0,0,0.18);
+          border-radius: 8px;
+          padding: 4px;
+          flex-shrink: 0;
+        }
+        .edition-btn {
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: .82rem; font-weight: 700;
+          letter-spacing: .08em; text-transform: uppercase;
+          color: rgba(255,255,255,.6);
+          background: none; border: none; cursor: pointer;
+          padding: .35rem .75rem;
+          border-radius: 6px;
+          transition: background .2s, color .2s;
+          white-space: nowrap;
+        }
+        .edition-btn:hover { color: rgba(255,255,255,.9); background: rgba(255,255,255,.08); }
+        .edition-btn.active {
+          background: rgba(255,255,255,.18);
+          color: #fff;
+          box-shadow: 0 1px 4px rgba(0,0,0,.2);
+        }
 
         .nav-links { display: flex; gap: 1.75rem; list-style: none; }
         .nav-links a {
@@ -205,9 +300,32 @@ export default function Home() {
         }
         .mob-menu a:hover { color: #fff; }
 
+        /* Edition switcher in mobile menu */
+        .mob-edition-switcher {
+          display: flex; gap: 8px; margin-bottom: .5rem;
+        }
+        .mob-edition-btn {
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: 1.1rem; font-weight: 700;
+          letter-spacing: .08em; text-transform: uppercase;
+          color: rgba(255,255,255,.55);
+          background: rgba(255,255,255,.07);
+          border: 1px solid rgba(255,255,255,.12);
+          border-radius: 8px;
+          cursor: pointer;
+          padding: .45rem 1.1rem;
+          transition: background .2s, color .2s;
+        }
+        .mob-edition-btn.active {
+          background: rgba(255,255,255,.18);
+          color: #fff;
+          border-color: rgba(255,255,255,.3);
+        }
+
         @media (max-width: 768px) {
           .nav-links { display: none; }
           .burger { display: flex; }
+          .edition-switcher { display: none; }
         }
 
         /* ── HERO ─────────────────────────────────────────────────── */
@@ -233,7 +351,6 @@ export default function Home() {
             rgba(0,0,0,.6) 100%);
         }
 
-        /* Frosted glass panel — diagonal clip at bottom for a flag/pennant feel */
         .hero-panel {
           position: absolute; top: 50%; left: 50%;
           transform: translate(-50%, -50%);
@@ -320,8 +437,6 @@ export default function Home() {
         }
 
         /* ── 3-D STRIPES ──────────────────────────────────────────── */
-        /* Each section sits like a stacked slab with a drop shadow and a
-           coloured bottom edge pseudo-element for the depth illusion */
         .s-white {
           background: #fff;
           box-shadow: var(--stripe-shadow);
@@ -496,6 +611,23 @@ export default function Home() {
             {/* NAVBAR */}
             <nav className={`navbar${scrolled ? ' scrolled' : ''}`}>
                 <a href="#" className="nav-logo">Erasmus&nbsp;<span>España</span></a>
+
+                {/* Edition switcher — desktop */}
+                <div className="edition-switcher">
+                    <button
+                        className={`edition-btn${edition === '2425' ? ' active' : ''}`}
+                        onClick={() => switchEdition('2425')}
+                    >
+                        2024/25
+                    </button>
+                    <button
+                        className={`edition-btn${edition === '2526' ? ' active' : ''}`}
+                        onClick={() => switchEdition('2526')}
+                    >
+                        2025/26
+                    </button>
+                </div>
+
                 <ul className="nav-links">
                     {NAV_LINKS.map(l => <li key={l.href}><a href={l.href}>{l.label}</a></li>)}
                 </ul>
@@ -506,6 +638,21 @@ export default function Home() {
 
             {/* MOBILE MENU */}
             <div className={`mob-menu${menuOpen ? ' open' : ''}`}>
+                {/* Edition switcher — mobile */}
+                <div className="mob-edition-switcher">
+                    <button
+                        className={`mob-edition-btn${edition === '2425' ? ' active' : ''}`}
+                        onClick={() => switchEdition('2425')}
+                    >
+                        2024/2025
+                    </button>
+                    <button
+                        className={`mob-edition-btn${edition === '2526' ? ' active' : ''}`}
+                        onClick={() => switchEdition('2526')}
+                    >
+                        2025/2026
+                    </button>
+                </div>
                 {NAV_LINKS.map(l => <a key={l.href} href={l.href} onClick={() => setMenuOpen(false)}>{l.label}</a>)}
             </div>
 
@@ -523,8 +670,8 @@ export default function Home() {
                 <div className="hero-panel">
                     <div className="logo-spot">Logo</div>
                     <h1 className="hero-title">Nasze<br /><em>Staże</em><br />w Hiszpanii</h1>
-                    <p className="hero-sub">Program Erasmus+ · Málaga 2025–2026</p>
-                    <a href="#staze" className="hero-btn">Poznaj miejsca</a>
+                    <p className="hero-sub">{cfg.heroSub}</p>
+                    <a href="#staze" className="hero-btn">{cfg.heroBtn}</a>
                 </div>
 
                 <div className="dots">
@@ -538,12 +685,9 @@ export default function Home() {
             {/* SECTION 1 — internship cards (white slab) */}
             <section id="staze" className="sec s-white">
                 <div className="inner">
-                    <p className="eyebrow">Erasmus+ 2025–2026</p>
+                    <p className="eyebrow">{cfg.eyebrow}</p>
                     <h2 className="sec-title">Nasze miejsca stażu</h2>
-                    <p className="sec-body">
-                        W roku szkolnym 2025/2026 nasi uczniowie odbyli staże zawodowe w renomowanych
-                        firmach na Costa del Sol. Poznaj miejsca, które stały się ich tymczasowym domem.
-                    </p>
+                    <p className="sec-body">{cfg.bodyText}</p>
                     <div className="cards">
                         {INTERNSHIP_CARDS.map(c => (
                             <div className="card" key={c.name}>
@@ -611,7 +755,7 @@ export default function Home() {
                     <h2 className="sec-title">Prezentacje stażowe</h2>
                     <p className="sec-body">Każdy zespół przygotował prezentację podsumowującą swój pobyt.</p>
                     <div className="pdf-grid">
-                        {staze2526Pdfs.map((file) => (
+                        {activePdfs.map((file) => (
                             <a
                                 className="pdf-card"
                                 key={file.fileId}
@@ -624,11 +768,6 @@ export default function Home() {
                                     alt={file.name}
                                     loading="lazy"
                                     onError={(e) => {
-                                        // Some filenames (commas, unusual punctuation) can trip
-                                        // ImageKit's thumbnail generator even when correctly
-                                        // URL-encoded. Fall back to a plain PDF placeholder
-                                        // instead of showing a broken image icon — the link
-                                        // to the actual file still works either way.
                                         const img = e.currentTarget;
                                         img.onerror = null;
                                         img.src =
