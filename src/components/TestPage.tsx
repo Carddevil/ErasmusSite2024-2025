@@ -280,7 +280,7 @@ const EDITION_CONFIG = {
         heroSub:     'Program Erasmus+ · Málaga 2025–2026',
         heroBtn:     'Poznaj miejsca',
         eyebrow:     'Erasmus+',
-        bodyText:    'W roku szkolnym 2025/2026 nasi uczniowie odbyli staże zawodowe w renomowanych firmach na Costa del Sol. Poznaj miejsca, które stały się ich tymczasowym domem.',
+        bodyText:    'W roku szkolnym 2025/2026 nasi uczniowie odbyli staże zawodowe w renomowanych firmach na Costa del Sol. Między innymi...',
         cardDefs:    CARD_DEFS_2526,
     }
 };
@@ -663,7 +663,7 @@ function HomePage({ onNavigate }: { onNavigate: (view: PageView) => void }) {
             {/* FOOTER */}
             <footer id="kontakt">
                 <div className="foot-inner" style={{
-                    gridTemplateColumns: stronaStartowaFile ? '2fr 1fr 1fr 1.2fr' : '2fr 1fr 1fr'
+                    gridTemplateColumns: stronaStartowaFile ? '2fr 1fr 1fr 1.2fr 1.2fr' : '2fr 1fr 1fr 1.4fr'
                 }}>
                     <div>
                         <div className="foot-brand">Erasmus&nbsp;<span>España</span></div>
@@ -688,7 +688,7 @@ function HomePage({ onNavigate }: { onNavigate: (view: PageView) => void }) {
                         </address>
                     </div>
 
-                    {/* PDF IMAGE COMPONENT PLACEHOLDER ON THE RIGHT SIDE */}
+                    {/* PDF IMAGE COMPONENT PLACEHOLDER */}
                     {stronaStartowaFile && (
                         <div className="foot-col" style={{ display: 'flex', flexDirection: 'column' }}>
                             <h4>Dokument zaświadczający</h4>
@@ -725,7 +725,71 @@ function HomePage({ onNavigate }: { onNavigate: (view: PageView) => void }) {
                             </a>
                         </div>
                     )}
+
+                    {/* NOWA KOLUMNA PO PRAWEJ STRONIE: LOGOTYPY JEDEN POD DRUGIM */}
+                    <div className="foot-col" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <h4>Oznaczenia projektu</h4>
+
+                        {/* LOGO SZKOŁY */}
+                        <div style={{
+                            width: '100%',
+                            height: '90px',
+                            background: 'rgba(255,255,255,0.9)',
+                            border: '1px dashed rgba(255,255,255,0.2)',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                            transition: 'background 0.2s'
+                        }}>
+                            <img
+                                src="/logo-szkoly.png"
+                                alt="Logo Szkoły"
+                                style={{ maxWidth: '90%', maxHeight: '85%', objectFit: 'contain' }}
+                                onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    if(e.currentTarget.parentElement) {
+                                        e.currentTarget.parentElement.innerText = '🏫 Technikum nr 3';
+                                        e.currentTarget.parentElement.style.fontSize = '12px';
+                                        e.currentTarget.parentElement.style.fontWeight = '600';
+                                        e.currentTarget.parentElement.style.color = 'rgba(255,255,255,0.4)';
+                                    }
+                                }}
+                            />
+                        </div>
+
+                        {/* LOGO ERASMUS+ */}
+                        <div style={{
+                            width: '100%',
+                            height: '90px',
+                            background: 'rgba(255,255,255,0.9)',
+                            border: '1px dashed rgba(255,255,255,0.2)',
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                            transition: 'background 0.2s'
+                        }}>
+                            <img
+                                src="/logo-erasmus.png"
+                                alt="Logo Erasmus+"
+                                style={{ maxWidth: '90%', maxHeight: '85%', objectFit: 'contain' }}
+                                onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    if(e.currentTarget.parentElement) {
+                                        e.currentTarget.parentElement.innerText = '🇪🇺 Program Erasmus+';
+                                        e.currentTarget.parentElement.style.fontSize = '12px';
+                                        e.currentTarget.parentElement.style.fontWeight = '600';
+                                        e.currentTarget.parentElement.style.color = 'rgba(255,255,255,0.4)';
+                                    }
+                                }}
+                            />
+                        </div>
+                    </div>
                 </div>
+
                 <div className="foot-bottom">
                     <span>© {new Date().getFullYear()} Erasmus+ España — Wszelkie prawa zastrzeżone</span>
                     <span>Finansowane ze środków Unii Europejskiej 🇪🇺</span>
